@@ -1,0 +1,36 @@
+.interview-box {
+  text-align: center;
+  max-width: 600px;
+  margin: auto;
+}
+
+/* 🎥 FIX VIDEO SIZE */
+.video-box {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.video-box video {
+  width: 100%;
+  max-width: 500px;   /* 🔥 FIX */
+  border-radius: 12px;
+}
+
+/* 📍 LOCATION */
+.location-text {
+  color: var(--subtext);
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+/* 🧾 TRANSCRIPT */
+.transcript-box {
+  margin-top: 20px;
+  text-align: left;
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
