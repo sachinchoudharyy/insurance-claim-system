@@ -1,6 +1,6 @@
 // const BASE = "http://127.0.0.1:8000";
 
-const BASE = "https://claim-backend.onrender.com";
+const BASE = "https://claim-backend-4xum.onrender.com";
 
 export async function register(phone, name) {
   const res = await fetch(`${BASE}/auth/register`, {
