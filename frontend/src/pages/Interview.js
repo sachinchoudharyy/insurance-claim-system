@@ -13,7 +13,8 @@ export default function Interview(props) {
   const [transcript, setTranscript] = useState([]);
   const [gpsLocation, setGpsLocation] = useState(null);
   const [address, setAddress] = useState(null);
-  const [started, setStarted] = useState(false); // ✅ NEW
+  const [started, setStarted] = useState(false);
+  const [cameraMode, setCameraMode] = useState("user"); // ✅ NEW
 
   const videoRef = useRef(null);
   const recorderRef = useRef(null);
@@ -52,7 +53,9 @@ export default function Interview(props) {
   const startVideo = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          facingMode: cameraMode // ✅ UPDATED
+        },
         audio: true
       });
 
@@ -123,6 +126,39 @@ export default function Interview(props) {
     }, 30000);
   };
 
+  /* ---------------- CAMERA SWITCH ---------------- */
+
+  const switchCamera = async () => {
+    try {
+      if (!streamRef.current) return;
+
+      // stop current stream
+      streamRef.current.getTracks().forEach((t) => t.stop());
+
+      const newMode = cameraMode === "user" ? "environment" : "user";
+      setCameraMode(newMode);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newMode },
+        audio: true
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      // restart recording
+      recordSegment(stream);
+
+    } catch (err) {
+      console.error("Camera switch failed", err);
+      alert("Camera switch not supported");
+    }
+  };
+
   /* ---------------- AUDIO ---------------- */
 
   const startAudio = async () => {
@@ -131,7 +167,6 @@ export default function Interview(props) {
     const audioContext = new AudioContext({ sampleRate: 48000 });
     audioContextRef.current = audioContext;
 
-    // ✅ FIX FOR MOBILE
     if (audioContext.state === "suspended") {
       await audioContext.resume();
     }
@@ -277,6 +312,7 @@ export default function Interview(props) {
 
           {!started ? (
             <button
+              className="start-btn"
               onClick={async () => {
                 setStarted(true);
                 await startInterview();
@@ -285,9 +321,22 @@ export default function Interview(props) {
               Start Interview
             </button>
           ) : (
-            <button onClick={endInterview}>
-              End Interview
-            </button>
+            <>
+              <div className="recording-indicator">
+                <div className="recording-dot"></div>
+                Recording...
+              </div>
+
+              <div className="action-buttons">
+                <button className="switch-btn" onClick={switchCamera}>
+                  Switch Camera
+                </button>
+
+                <button className="end-btn" onClick={endInterview}>
+                  End Interview
+                </button>
+              </div>
+            </>
           )}
 
           <div className="transcript-box">
