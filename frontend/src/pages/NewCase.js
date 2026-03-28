@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { createCase } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import "../styles/case.css";
+import { LoadingContext } from "../context/LoadingContext";
 
 const motorCategories = [
   "Insured",
@@ -23,31 +24,38 @@ export default function NewCase({ setPage, setCurrentCase }) {
 
   const user = JSON.parse(localStorage.getItem("user"));
   const navigate = useNavigate();
+  const { setLoading } = useContext(LoadingContext);
 
   const startCase = async () => {
+    try {
+      setLoading(true);
 
-    const res = await createCase({
-      case_id: caseId,
-      claim_type: claimType,
-      user_id: user.id,
-      category: category
-    });
+      const res = await createCase({
+        case_id: caseId,
+        claim_type: claimType,
+        user_id: user.id,
+        category: category
+      });
 
-    if (res.error) {
-      alert(res.error);
-      return;
+      if (res.error) {
+        alert(res.error);
+        return;
+      }
+
+      const caseData = {
+        ...res,
+        category,
+        language
+      };
+
+      if (setCurrentCase) setCurrentCase(caseData);
+      if (setPage) setPage("interview");
+
+      navigate("/interview", { state: caseData });
+
+    } finally {
+      setLoading(false);
     }
-
-    const caseData = {
-      ...res,
-      category,
-      language
-    };
-
-    if (setCurrentCase) setCurrentCase(caseData);
-    if (setPage) setPage("interview");
-
-    navigate("/interview", { state: caseData });
   };
 
   return (

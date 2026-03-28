@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { getCases } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import "../styles/dashboard.css";
+import { LoadingContext } from "../context/LoadingContext";
 
 export default function Dashboard() {
 
@@ -11,18 +12,27 @@ export default function Dashboard() {
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user"));
+  const { setLoading } = useContext(LoadingContext);
 
   useEffect(() => {
     loadCases();
   }, []);
 
   const loadCases = async () => {
-    const res = await getCases(user.id);
-    if (res.cases) {
-      const unique = Array.from(
-        new Map(res.cases.map((c) => [c.id, c])).values()
-      );
-      setCases(unique);
+    try {
+      setLoading(true);
+
+      const res = await getCases(user.id);
+
+      if (res.cases) {
+        const unique = Array.from(
+          new Map(res.cases.map((c) => [c.id, c])).values()
+        );
+        setCases(unique);
+      }
+
+    } finally {
+      setLoading(false);
     }
   };
 

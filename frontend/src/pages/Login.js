@@ -93,10 +93,11 @@
 //   );
 // }
 
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { register, login } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import "../styles/login.css";
+import { LoadingContext } from "../context/LoadingContext";
 
 export default function Login() {
 
@@ -105,6 +106,7 @@ export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
 
   const navigate = useNavigate();
+  const { setLoading } = useContext(LoadingContext);
 
   const handleSubmit = async () => {
 
@@ -114,6 +116,8 @@ export default function Login() {
     }
 
     try {
+      setLoading(true); // ✅ START
+
       if (isRegister) {
         await register(phone, name);
       }
@@ -131,6 +135,8 @@ export default function Login() {
     } catch (err) {
       console.error(err);
       alert("Something went wrong");
+    } finally {
+      setLoading(false); // ✅ END
     }
   };
 
@@ -138,7 +144,7 @@ export default function Login() {
     <div className="page">
       <div className="card login-box">
 
-        <h2 className="login-title">ClaimSure AI</h2>
+        <h2 className="login-title">Interview claim system</h2>
 
         {isRegister && (
           <input

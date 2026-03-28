@@ -1,13 +1,29 @@
-import React from "react";
+import React, { useContext } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles/global.css";
-import { BrowserRouter } from "react-router-dom";   // ✅ ADD
+import { BrowserRouter } from "react-router-dom";
+
+import { LoadingProvider, LoadingContext } from "./context/LoadingContext";
+import Loader from "./components/Loader";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
+function AppWrapper() {
+  const { loading } = useContext(LoadingContext);
+
+  return (
+    <>
+      {loading && <Loader />}
+      <App />
+    </>
+  );
+}
+
 root.render(
-  <BrowserRouter>   {/* ✅ REQUIRED */}
-    <App />
+  <BrowserRouter>
+    <LoadingProvider>
+      <AppWrapper />
+    </LoadingProvider>
   </BrowserRouter>
 );
