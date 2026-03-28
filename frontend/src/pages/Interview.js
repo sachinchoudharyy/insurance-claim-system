@@ -3,7 +3,7 @@ import { connectInterview } from "../services/websocket";
 import { useLocation } from "react-router-dom";
 import "../styles/interview.css";
 
-const BASE = "http://127.0.0.1:8000";
+const BASE = "https://claim-backend-4xum.onrender.com";
 
 export default function Interview(props) {
 
