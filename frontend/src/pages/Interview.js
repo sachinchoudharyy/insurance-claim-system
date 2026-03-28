@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { connectInterview } from "../services/websocket";
 import { useLocation } from "react-router-dom";
-import "../styles/interview.css"; // ✅ ADD
+import "../styles/interview.css";
 
 const BASE = "http://127.0.0.1:8000";
 
@@ -13,6 +13,7 @@ export default function Interview(props) {
   const [transcript, setTranscript] = useState([]);
   const [gpsLocation, setGpsLocation] = useState(null);
   const [address, setAddress] = useState(null);
+  const [started, setStarted] = useState(false); // ✅ NEW
 
   const videoRef = useRef(null);
   const recorderRef = useRef(null);
@@ -21,11 +22,7 @@ export default function Interview(props) {
   const pcmBufferRef = useRef([]);
 
   const wsRef = useRef(null);
-
-  const videoChunksRef = useRef([]);
   const interviewIdRef = useRef(null);
-
-  const audioRecorderRef = useRef(null);
 
   const audioContextRef = useRef(null);
   const processorRef = useRef(null);
@@ -43,7 +40,6 @@ export default function Interview(props) {
             longitude: pos.coords.longitude,
             accuracy: pos.coords.accuracy
           };
-
           setGpsLocation(loc);
           resolve(loc);
         },
@@ -54,25 +50,38 @@ export default function Interview(props) {
   /* ---------------- VIDEO ---------------- */
 
   const startVideo = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
 
-    streamRef.current = stream;
+      streamRef.current = stream;
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      recordSegment(stream);
+
+    } catch (err) {
+      alert("Camera/Microphone permission required");
+      console.error(err);
+      throw err;
     }
-
-    recordSegment(stream);
   };
 
   const recordSegment = (stream) => {
-    const recorder = new MediaRecorder(stream, {
-      mimeType: "video/webm"
-    });
+    let mimeType = "video/webm";
+
+    if (!MediaRecorder.isTypeSupported("video/webm")) {
+      mimeType = "";
+    }
+
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
 
     let chunks = [];
 
@@ -84,7 +93,7 @@ export default function Interview(props) {
 
     recorder.onstop = async () => {
       if (chunks.length > 0) {
-        const blob = new Blob(chunks, { type: "video/webm" });
+        const blob = new Blob(chunks, { type: mimeType || "video/webm" });
 
         const form = new FormData();
         form.append("file", blob);
@@ -114,13 +123,18 @@ export default function Interview(props) {
     }, 30000);
   };
 
-  /* ---------------- AUDIO STREAM ---------------- */
+  /* ---------------- AUDIO ---------------- */
 
   const startAudio = async () => {
     const stream = streamRef.current;
 
     const audioContext = new AudioContext({ sampleRate: 48000 });
     audioContextRef.current = audioContext;
+
+    // ✅ FIX FOR MOBILE
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
 
     const source = audioContext.createMediaStreamSource(stream);
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -148,55 +162,61 @@ export default function Interview(props) {
           const chunk = new Int16Array(pcmBufferRef.current);
           wsRef.current.send(chunk.buffer);
         }
-
         pcmBufferRef.current = [];
       }
     };
   };
 
-  /* ---------------- START INTERVIEW ---------------- */
+  /* ---------------- START ---------------- */
 
   const startInterview = async () => {
-    const loc = await getLocation();
+    try {
+      stopRecordingRef.current = false;
 
-    const res = await fetch(`${BASE}/interview/start`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        case_id: caseData.id,
-        category: caseData.category,
-        language: caseData.language,
-        location: loc
-      })
-    });
+      const loc = await getLocation();
 
-    const data = await res.json();
+      const res = await fetch(`${BASE}/interview/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          case_id: caseData.id,
+          category: caseData.category,
+          language: caseData.language,
+          location: loc
+        })
+      });
 
-    interviewIdRef.current = data.id;
-    setAddress(data.location_text);
+      const data = await res.json();
 
-    wsRef.current = connectInterview(data.id);
+      interviewIdRef.current = data.id;
+      setAddress(data.location_text);
 
-    wsRef.current.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
+      wsRef.current = connectInterview(data.id);
 
-      if (msg.type === "transcript") {
-        setTranscript((prev) => [...prev, msg.text]);
-      }
+      wsRef.current.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
 
-      if (msg.type === "completed") {
-        console.log("Interview location:", msg.location);
-        console.log("Interview complete", msg.qa);
-      }
-    };
+        if (msg.type === "transcript") {
+          setTranscript((prev) => [...prev, msg.text]);
+        }
 
-    await startVideo();
-    await startAudio();
+        if (msg.type === "completed") {
+          console.log("Interview complete", msg.qa);
+        }
+      };
+
+      await startVideo();
+      await startAudio();
+
+    } catch (err) {
+      console.error("Start failed:", err);
+      setStarted(false);
+    }
   };
 
-  /* ---------------- END INTERVIEW ---------------- */
+  /* ---------------- END ---------------- */
 
   const endInterview = async () => {
     stopRecordingRef.current = true;
@@ -233,13 +253,10 @@ export default function Interview(props) {
     }
 
     alert("Interview Completed");
+    setStarted(false);
   };
 
-  /* ---------------- INIT ---------------- */
-
-  useEffect(() => {
-    startInterview();
-  }, []);
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="page">
@@ -249,7 +266,7 @@ export default function Interview(props) {
           <h2>Interview Recording</h2>
 
           <div className="video-box">
-            <video ref={videoRef} autoPlay muted />
+            <video ref={videoRef} autoPlay muted playsInline />
           </div>
 
           {address && (
@@ -258,9 +275,20 @@ export default function Interview(props) {
             </p>
           )}
 
-          <button onClick={endInterview}>
-            End Interview
-          </button>
+          {!started ? (
+            <button
+              onClick={async () => {
+                setStarted(true);
+                await startInterview();
+              }}
+            >
+              Start Interview
+            </button>
+          ) : (
+            <button onClick={endInterview}>
+              End Interview
+            </button>
+          )}
 
           <div className="transcript-box">
             <h3>Transcript</h3>
